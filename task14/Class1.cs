@@ -45,6 +45,38 @@ public class DefiniteIntegral {
         return total;
     }
 
+    public static double SolveOptimized(double a, double b, Func<double, double> function, double step, int threadsNumber) {
+        if (threadsNumber <= 0)
+            throw new ArgumentException("Ошибка: число потоков должно быть положительным", nameof(threadsNumber));
+        if (step <= 0)
+            throw new ArgumentException("Ошибка: шаг должен быть положительным", nameof(step));
+            
+        double length = b - a;
+        if (length <= 0)
+            return 0.0;
+
+        double segmentLength = length / threadsNumber;
+        double[] partialSums = new double[threadsNumber];
+        
+        var threads = Enumerable.Range(0, threadsNumber)
+            .Select(i => {
+                double startSegment = a + i * segmentLength;
+                double endSegment = (i == threadsNumber - 1) ? b : startSegment + segmentLength;
+
+                var thread = new Thread(() => {
+                    partialSums[i] = LocalIntegral(startSegment, endSegment, function, step);
+                });
+                
+                thread.Start();
+                return thread;
+            })
+            .ToList();
+
+        threads.ForEach(t => t.Join());
+
+        return partialSums.Sum();
+    }
+
     private static double LocalIntegral(double start, double end, Func<double, double> function, double step) {
         double sum = 0.0;
         double current = start;
@@ -58,5 +90,9 @@ public class DefiniteIntegral {
             f_current = f_next;
         }
         return sum;
+    }
+
+    public static double SingleThreadIntegral(double a, double b, Func<double, double> function, double step) {
+        return LocalIntegral(a, b, function, step);
     }
 }
